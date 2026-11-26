@@ -1,0 +1,9 @@
+# Local settings and secrets
+.env
+
+# Pipeline output
+blazemeter/
+
+# Python
+.venv/
+__pycache__/

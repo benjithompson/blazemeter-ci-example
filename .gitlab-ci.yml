@@ -1,0 +1,57 @@
+# Runs a BlazeMeter test, one job per stage. State and results are passed
+# between jobs in the blazemeter/ artifact.
+#
+# Settings: add BZM_API_KEY (masked, protected) and the other variables from
+# .env.example under Settings > CI/CD > Variables, or upload a filled-in .env
+# as a File variable named BZM_ENV_FILE.
+
+stages: [validate, create, run, monitor, results, report]
+
+default:
+  image: python:3.12-slim
+  before_script:
+    - pip install -q -r requirements.txt
+    - if [ -n "$BZM_ENV_FILE" ]; then cp "$BZM_ENV_FILE" .env; fi
+  artifacts:
+    paths: [blazemeter/]
+    when: always
+    expire_in: 30 days
+
+validate:
+  stage: validate
+  script: python blazemeter_pipeline.py validate
+
+create-test:
+  stage: create
+  script: python blazemeter_pipeline.py create-test
+
+run-test:
+  stage: run
+  script: python blazemeter_pipeline.py run-test
+
+monitor-test:
+  stage: monitor
+  timeout: 1h  # must be longer than ramp-up + duration; cancelling the job stops the test
+  script: python blazemeter_pipeline.py monitor-test
+
+collect-results:
+  stage: results
+  script: python blazemeter_pipeline.py collect-results
+  # Uncomment to report failed criteria as a warning instead of failing the pipeline:
+  # allow_failure:
+  #   exit_codes: [1]
+  artifacts:
+    paths: [blazemeter/]
+    when: always
+    expire_in: 30 days
+    reports:
+      junit: blazemeter/junit.xml
+
+generate-report:
+  stage: report
+  when: always
+  script: python blazemeter_pipeline.py generate-report
+  artifacts:
+    paths: [blazemeter/]
+    expose_as: BlazeMeter results
+    expire_in: 30 days
